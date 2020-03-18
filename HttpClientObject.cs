@@ -1,16 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Globalization;
 using System.Net;
-using System.Reflection;
-using System.Security.Cryptography;
-using System.Security.Policy;
 using System.Web;
 
 namespace SimpleHttpServerLib
@@ -85,6 +80,7 @@ namespace SimpleHttpServerLib
 
         private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client, NetworkStream stream)
         {
+            currentRequest.Stream = stream;
             var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
             var ip = addr.ToString();
 
@@ -154,6 +150,15 @@ namespace SimpleHttpServerLib
                 Logger?.Log("exist: " + File.Exists(HtmlGenerator.GetAbsolutePath(path)));
 
                 //check router (clean url)
+
+                bool handled = false;
+                var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
+                if (cc != null)
+                {
+                    var spl2 = cc.Split(new char[] { ':', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
+                    var cookieId = spl2[1];
+                    currentRequest.Cookie = cookieId;
+                }
                 if (HttpServer.Router != null)
                 {
                     try
@@ -178,7 +183,7 @@ namespace SimpleHttpServerLib
                     catch (Exception ex)
                     {
                         string err = "<p>" + ex.Message + "</p><p>" + ex.StackTrace.ToString() + "</p>";
-                        string Str = "HTTP/1.1 200 OK\nContent-type: text/html\nContent-Length:" +
+                        string Str = "HTTP/1.1 200 OK\nContent-type: text/html; charset=utf-8\nContent-Length:" +
                                      err.Length.ToString() + "\n\n" + err;
 
                         byte[] Buffer = Encoding.UTF8.GetBytes(Str);
@@ -210,6 +215,20 @@ namespace SimpleHttpServerLib
 
                     stream.Write(Buffer, 0, Buffer.Length);
                     stream.Write(bb, 0, bb.Length);
+                    handled = true;
+                }
+                if (path.EndsWith("wmv") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
+                {
+                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
+
+                    string Str = "HTTP/1.1 200 OK\nContent-type: video/x-ms-wmv\nContent-Length:" +
+                                 bb.Length.ToString() + "\n\n";
+                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+
+                    stream.Write(Buffer, 0, Buffer.Length);
+                    stream.Write(bb, 0, bb.Length);
+                    handled = true;
+                    return null;
                 }
 
                 if (path.EndsWith("png") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
@@ -223,6 +242,7 @@ namespace SimpleHttpServerLib
 
                     stream.Write(Buffer, 0, Buffer.Length);
                     stream.Write(bb, 0, bb.Length);
+                    handled = true;
                 }
 
                 if (path.EndsWith("htm") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
@@ -238,13 +258,13 @@ namespace SimpleHttpServerLib
                         ctx.ParseQuery(query);
                     }
 
-                    var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
-                    if (cc != null)
-                    {
-                        var spl2 = cc.Split(new char[] { ':', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
-                        var cookieId = spl2[1];
-                        currentRequest.Cookie = cookieId;
-                    }
+                    //var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
+                    //if (cc != null)
+                    //{
+                    //    var spl2 = cc.Split(new char[] { ':', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
+                    //    var cookieId = spl2[1];
+                    //    currentRequest.Cookie = cookieId;
+                    //}
 
                     if (HtmlGenerator.CodeTypes.ContainsKey(path))
                     {
@@ -284,8 +304,6 @@ namespace SimpleHttpServerLib
                                          len.ToString()
                                          + "\n\n" + Html);
 
-
-
                             var Str = sb.ToString();
 
                             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
@@ -305,6 +323,22 @@ namespace SimpleHttpServerLib
                         stream.Write(Buffer, 0, Buffer.Length);
                     }
                 }
+
+                if (!handled)
+                {
+                    try
+                    {
+                        if (File.Exists(HtmlGenerator.GetAbsolutePath(path)))
+                        {
+                            var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
+                            HttpStuff.SendResponse(currentRequest.Stream, bb);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+
+                    }
+                }
             }
             return null;
         }
@@ -321,6 +355,11 @@ namespace SimpleHttpServerLib
 
             ctx.Page.Context = ctx;
             ctx.Page.OnPageLoad(ctx);
+            if (ctx.Response.OverrideResponse)
+            {
+                return ctx.Response.OverrideResponseOutput;
+            }
+            if (ctx.Redirect) return null;
             /*var plm = ctx.CodeType.GetMethod("OnPageLoad");
             if (plm != null)
             {
@@ -371,10 +410,5 @@ namespace SimpleHttpServerLib
                 th.Abort();
             }
         }
-    }
-
-    public interface ILog
-    {
-        void Log(string msg);
     }
 }

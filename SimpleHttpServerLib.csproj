@@ -43,14 +43,19 @@
     <Compile Include="FileLogger.cs" />
     <Compile Include="HtmlGenerator.cs" />
     <Compile Include="HttpClientObject.cs" />
+    <Compile Include="HttpConnectInfo.cs" />
     <Compile Include="HttpContext.cs" />
     <Compile Include="HttpPage.cs" />
     <Compile Include="HttpParseProcessor.cs" />
     <Compile Include="HttpSimpleParser.cs" />
+    <Compile Include="HttpStuff.cs" />
+    <Compile Include="ILog.cs" />
     <Compile Include="JstlParseProcessor.cs" />
+    <Compile Include="MultipartItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="SimpleHttpRequest.cs" />
+    <Compile Include="SimpleHttpResponse.cs" />
     <Compile Include="UrlRouter.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

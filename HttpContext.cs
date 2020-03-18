@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 
 namespace SimpleHttpServerLib
 {
@@ -30,10 +29,5 @@ namespace SimpleHttpServerLib
 
             }
         }
-    }
-
-    public class SimpleHttpResponse
-    {
-        public Dictionary<string, string> Headers = new Dictionary<string, string>();
     }
 }
