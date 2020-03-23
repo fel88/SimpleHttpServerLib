@@ -129,9 +129,12 @@ namespace SimpleHttpServerLib
 
                 var spl = currentRequest.Header.Split(new char[] { '/', ' ', '?' }, StringSplitOptions.RemoveEmptyEntries)
                    .ToArray();
+                var splh = currentRequest.Header.Split(new string[] { "GET", "HTTP", " ", "?" }, StringSplitOptions.RemoveEmptyEntries)
+                 .ToArray();
 
                 string Html = "<html><body><h1>It works!</h1></body></html>";
                 string path = spl[1];
+                path = splh[0];
 
                 if (spl[1] == "HTTP")
                 {
@@ -143,6 +146,7 @@ namespace SimpleHttpServerLib
                     path = "Index.htm";
                 }
 
+                Console.WriteLine("request: " + path);
 
                 Logger?.Log("domain dir: " + System.AppDomain.CurrentDomain.BaseDirectory);
                 Logger?.Log("path: " + path);
@@ -192,7 +196,18 @@ namespace SimpleHttpServerLib
                     }
                 }
 
+                if (path.EndsWith("css") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
+                {
+                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
 
+                    string Str = "HTTP/1.1 200 OK\nContent-type: text/css; charset=utf-8\nContent-Length:" +
+                                 bb.Length.ToString() + "\n\n";
+                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+
+                    stream.Write(Buffer, 0, Buffer.Length);
+                    stream.Write(bb, 0, bb.Length);
+                    return null;
+                }
                 if (path.EndsWith("js") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
                 {
                     var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
@@ -245,9 +260,10 @@ namespace SimpleHttpServerLib
                     handled = true;
                 }
 
+                
                 if (path.EndsWith("htm") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
                 {
-                    Html = HtmlGenerator.Get(path);
+                    Html = HtmlGenerator.Get(HtmlGenerator.GetAbsolutePath(path));
 
                     SimpleHttpContext ctx = new SimpleHttpContext();
 
@@ -256,6 +272,10 @@ namespace SimpleHttpServerLib
                         var query = spl[2];
                         query = Http​Utility.UrlDecode(query);
                         ctx.ParseQuery(query);
+                    }
+                    else
+                    {
+
                     }
 
                     //var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
@@ -280,6 +300,7 @@ namespace SimpleHttpServerLib
                     {
                         ctx.Request = currentRequest;
                         ctx.IP = ip;
+
                         Html = DynamicUpdate(Html, ctx);
                         if (ctx.Redirect)
                         {
@@ -345,8 +366,10 @@ namespace SimpleHttpServerLib
 
         public static bool SingletonCall = false;
 
+
         private string DynamicUpdate(string html, SimpleHttpContext ctx)
         {
+            html = TemplateParser.Build(html, ctx);
             //search all <%
 
             bool inside = false;

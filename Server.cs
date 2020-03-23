@@ -62,6 +62,7 @@ namespace SimpleHttpServerLib
                         TcpClient client = listener.AcceptTcpClient();
                         var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
                         var ip = addr.ToString();
+                        Console.WriteLine("connected: " + ip);
                         if (!FilterIp || (AllowedIps.Contains(ip)))
                         {
                             HttpServer.Infos.Add(new HttpConnectInfo() { Ip = addr.ToString() });
@@ -71,7 +72,7 @@ namespace SimpleHttpServerLib
                                 HttpServer.Infos.RemoveAt(0);
                             }
 
-                            var clientObject = new HttpClientObject(client, HttpServer.Infos.Last());                            
+                            var clientObject = new HttpClientObject(client, HttpServer.Infos.Last());
 
                             Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
 
