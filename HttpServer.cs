@@ -24,7 +24,7 @@ namespace SimpleHttpServerLib
         {
             lock (LogFile)
             {
-                File.AppendAllText(LogFile, DateTime.Now.ToString() + ": " + str);
+                File.AppendAllText(LogFile, DateTime.Now.ToString() + ": " + str + Environment.NewLine);
             }
         }
 
@@ -63,18 +63,20 @@ namespace SimpleHttpServerLib
                         var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
                         var ip = addr.ToString();
                         Console.WriteLine("connected: " + ip);
+                        Log("connected: " + ip);
                         if (!FilterIp || (AllowedIps.Contains(ip)))
                         {
-                            HttpServer.Infos.Add(new HttpConnectInfo() { Ip = addr.ToString() });
+                            var cinf = new HttpConnectInfo() { Ip = addr.ToString() };
+                            /*HttpServer.Infos.Add();
 
                             while (HttpServer.Infos.Count > 100)
                             {
                                 HttpServer.Infos.RemoveAt(0);
-                            }
+                            }*/
 
-                            var clientObject = new HttpClientObject(client, HttpServer.Infos.Last());
+                            var clientObject = new HttpClientObject(client, cinf);
 
-                            Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
+                            Thread clientThread = new Thread(clientObject.Process);
 
                             clientThread.Start();
                             Connects++;
@@ -93,7 +95,11 @@ namespace SimpleHttpServerLib
                 finally
                 {
                     if (listener != null)
+                    {
                         listener.Stop();
+                        Log("listener stopping..");
+
+                    }
                 }
             });
             tt.IsBackground = true;

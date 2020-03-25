@@ -71,11 +71,31 @@ namespace SimpleHttpServerLib
                 catch (Exception ex)
                 {
                     Logger?.Log(ex.Message);
+                    HttpServer.Log("[" + Info.Ip + "] disconnected: " + ex.Message);
+                    Console.WriteLine("[" + Info.Ip + "] disconnected: " + ex.Message);
                     // ignored
                 }
             });
             th.IsBackground = true;
             th.Start();
+        }
+
+
+        public class MimeInfo
+        {
+            public string Extension;
+            public string Mime;
+        }
+
+        public static List<MimeInfo> Mimes = new List<MimeInfo>();
+
+        static HttpClientObject()
+        {
+            Mimes.Add(new MimeInfo() { Extension = "css", Mime = "text/css" });
+            Mimes.Add(new MimeInfo() { Extension = "js", Mime = "application/javascript" });
+            Mimes.Add(new MimeInfo() { Extension = "wmv", Mime = "video/x-ms-wmv" });
+            Mimes.Add(new MimeInfo() { Extension = "mp4", Mime = "video/mp4" });
+            Mimes.Add(new MimeInfo() { Extension = "png", Mime = "image/png" });
         }
 
         private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client, NetworkStream stream)
@@ -146,7 +166,8 @@ namespace SimpleHttpServerLib
                     path = "Index.htm";
                 }
 
-                Console.WriteLine("request: " + path);
+                Console.WriteLine($"[{ip}] request: " + path);
+                HttpServer.Log($"[{ip}] request: " + path);
 
                 Logger?.Log("domain dir: " + System.AppDomain.CurrentDomain.BaseDirectory);
                 Logger?.Log("path: " + path);
@@ -169,19 +190,27 @@ namespace SimpleHttpServerLib
                     {
                         //var spl22 = currentRequest.Header.Split(new char[] { ' ', '?' }, StringSplitOptions.RemoveEmptyEntries)
                         //.ToArray();
-                        var tpl = HttpServer.Router.GetData(currentRequest);
-
-                        if (tpl != null)
+                        var pth = HttpServer.Router.GetPath(currentRequest);
+                        if (pth != null)
                         {
-                            var bb = tpl.Item1;
-                            var mime = tpl.Item2;
-                            string Str = $"HTTP/1.1 200 OK\nContent-type: {mime}; charset=utf-8\nContent-Length:" +
-                            bb.Length.ToString() + "\n\n";
-                            byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+                            path = pth;
+                        }
+                        else
+                        {
+                            var tpl = HttpServer.Router.GetData(currentRequest);
 
-                            stream.Write(Buffer, 0, Buffer.Length);
-                            stream.Write(bb, 0, bb.Length);
-                            return null;
+                            if (tpl != null)
+                            {
+                                var bb = tpl.Item1;
+                                var mime = tpl.Item2;
+                                string Str = $"HTTP/1.1 200 OK\nContent-type: {mime}; charset=utf-8\nContent-Length:" +
+                                bb.Length.ToString() + "\n\n";
+                                byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+
+                                stream.Write(Buffer, 0, Buffer.Length);
+                                stream.Write(bb, 0, bb.Length);
+                                return null;
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -194,73 +223,27 @@ namespace SimpleHttpServerLib
                         stream.Write(Buffer, 0, Buffer.Length);
                         return null;
                     }
+
                 }
 
-                if (path.EndsWith("css") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
+                foreach (var item in Mimes)
                 {
-                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
+                    var p1 = (HtmlGenerator.GetAbsolutePath(path));
+                    if (path.EndsWith(item.Extension) && File.Exists(p1))
+                    {
+                        var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
 
-                    string Str = "HTTP/1.1 200 OK\nContent-type: text/css; charset=utf-8\nContent-Length:" +
-                                 bb.Length.ToString() + "\n\n";
-                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+                        string Str = $"HTTP/1.1 200 OK\nContent-type: {item.Mime}; charset=utf-8\nContent-Length:" +
+                                     bb.Length.ToString() + "\n\n";
+                        byte[] Buffer = Encoding.UTF8.GetBytes(Str);
 
-                    stream.Write(Buffer, 0, Buffer.Length);
-                    stream.Write(bb, 0, bb.Length);
-                    return null;
-                }
-                if (path.EndsWith("js") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
-                {
-                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
-
-                    string Str = "HTTP/1.1 200 OK\nContent-type: application/javascript; charset=utf-8\nContent-Length:" +
-                                 bb.Length.ToString() + "\n\n";
-                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
-
-                    stream.Write(Buffer, 0, Buffer.Length);
-                    stream.Write(bb, 0, bb.Length);
-                    return null;
-                }
-                if (path.EndsWith("avi") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
-                {
-                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
-
-                    string Str = "HTTP/1.1 200 OK\nContent-type: image/png\nContent-Length:" +
-                                 bb.Length.ToString() + "\n\n";
-                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
-
-                    stream.Write(Buffer, 0, Buffer.Length);
-                    stream.Write(bb, 0, bb.Length);
-                    handled = true;
-                }
-                if (path.EndsWith("wmv") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
-                {
-                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
-
-                    string Str = "HTTP/1.1 200 OK\nContent-type: video/x-ms-wmv\nContent-Length:" +
-                                 bb.Length.ToString() + "\n\n";
-                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
-
-                    stream.Write(Buffer, 0, Buffer.Length);
-                    stream.Write(bb, 0, bb.Length);
-                    handled = true;
-                    return null;
+                        stream.Write(Buffer, 0, Buffer.Length);
+                        stream.Write(bb, 0, bb.Length);
+                        return null;
+                    }
                 }
 
-                if (path.EndsWith("png") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
-                {
 
-                    var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
-
-                    string Str = "HTTP/1.1 200 OK\nContent-type: image/png\nContent-Length:" +
-                                 bb.Length.ToString() + "\n\n";
-                    byte[] Buffer = Encoding.UTF8.GetBytes(Str);
-
-                    stream.Write(Buffer, 0, Buffer.Length);
-                    stream.Write(bb, 0, bb.Length);
-                    handled = true;
-                }
-
-                
                 if (path.EndsWith("htm") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
                 {
                     Html = HtmlGenerator.Get(HtmlGenerator.GetAbsolutePath(path));
@@ -273,10 +256,7 @@ namespace SimpleHttpServerLib
                         query = Http​Utility.UrlDecode(query);
                         ctx.ParseQuery(query);
                     }
-                    else
-                    {
 
-                    }
 
                     //var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
                     //if (cc != null)
@@ -304,8 +284,15 @@ namespace SimpleHttpServerLib
                         Html = DynamicUpdate(Html, ctx);
                         if (ctx.Redirect)
                         {
-                            string Str = "HTTP/1.1 303 See other\nLocation: " + ctx.RedirectPath + "\n\n";
-                            byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+                            StringBuilder sb = new StringBuilder();
+
+                            sb.Append("HTTP/1.1 303 See other\n");
+                            foreach (var hitem in ctx.Response.Headers)
+                            {
+                                sb.Append($"{hitem.Key}: {hitem.Value}\n");
+                            }
+                            sb.Append("Location: " + ctx.RedirectPath + "\n\n");
+                            byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
                             stream.Write(Buffer, 0, Buffer.Length);
                         }
                         else
@@ -347,22 +334,47 @@ namespace SimpleHttpServerLib
 
                 if (!handled)
                 {
-                    try
+                    if (AllowAccessToUnhandledFiles)
                     {
-                        if (File.Exists(HtmlGenerator.GetAbsolutePath(path)))
+                        try
                         {
-                            var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
-                            HttpStuff.SendResponse(currentRequest.Stream, bb);
+                            if (File.Exists(HtmlGenerator.GetAbsolutePath(path)))
+                            {
+                                var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
+                                HttpStuff.SendResponse(currentRequest.Stream, bb);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+
                         }
                     }
-                    catch (Exception ex)
+                    else
                     {
+                        Console.WriteLine($"[{ip}] {path}: 404 Not Found");
+                        StringBuilder sb = new StringBuilder();
+
+                        string err = "<p>404. Not Found</p>";
+                        string Str = "HTTP/1.1 404 Not Found\nContent-type: text/html; charset=utf-8\nContent-Length:" +
+                                     err.Length.ToString() + "\n\n" + err;
+
+                        byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+                        stream.Write(Buffer, 0, Buffer.Length);
+
+
+
 
                     }
+
                 }
+
+
             }
             return null;
         }
+
+
+        public static bool AllowAccessToUnhandledFiles = false;
 
         public static bool SingletonCall = false;
 

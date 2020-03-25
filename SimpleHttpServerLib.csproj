@@ -40,6 +40,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CleanUrl.cs" />
     <Compile Include="FileLogger.cs" />
     <Compile Include="HtmlGenerator.cs" />
     <Compile Include="HttpClientObject.cs" />
@@ -53,9 +54,11 @@
     <Compile Include="JstlParseProcessor.cs" />
     <Compile Include="MultipartItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Server.cs" />
+    <Compile Include="HttpServer.cs" />
+    <Compile Include="SessionInfo.cs" />
     <Compile Include="SimpleHttpRequest.cs" />
     <Compile Include="SimpleHttpResponse.cs" />
+    <Compile Include="TemplateParser.cs" />
     <Compile Include="UrlRouter.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
