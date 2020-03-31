@@ -59,31 +59,39 @@ namespace SimpleHttpServerLib
 
                     while (true)
                     {
-                        TcpClient client = listener.AcceptTcpClient();
-                        var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
-                        var ip = addr.ToString();
-                        Console.WriteLine("connected: " + ip);
-                        Log("connected: " + ip);
-                        if (!FilterIp || (AllowedIps.Contains(ip)))
+                        try
                         {
-                            var cinf = new HttpConnectInfo() { Ip = addr.ToString() };
-                            /*HttpServer.Infos.Add();
-
-                            while (HttpServer.Infos.Count > 100)
+                            TcpClient client = listener.AcceptTcpClient();
+                            var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
+                            var ip = addr.ToString();
+                            Console.WriteLine("connected: " + ip);
+                            Log("connected: " + ip);
+                            if (!FilterIp || (AllowedIps.Contains(ip)))
                             {
-                                HttpServer.Infos.RemoveAt(0);
-                            }*/
+                                var cinf = new HttpConnectInfo() { Ip = addr.ToString() };
+                                /*HttpServer.Infos.Add();
 
-                            var clientObject = new HttpClientObject(client, cinf);
+                                while (HttpServer.Infos.Count > 100)
+                                {
+                                    HttpServer.Infos.RemoveAt(0);
+                                }*/
 
-                            Thread clientThread = new Thread(clientObject.Process);
+                                var clientObject = new HttpClientObject(client, cinf);
 
-                            clientThread.Start();
-                            Connects++;
+                                Thread clientThread = new Thread(clientObject.Process);
+
+                                clientThread.Start();
+                                Connects++;
+                            }
+                            else
+                            {
+                                client.Close();
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            client.Close();
+                            Log(ex.Message);
+                            Console.WriteLine(ex.Message);
                         }
                     }
                 }

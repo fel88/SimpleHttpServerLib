@@ -19,14 +19,17 @@ namespace SimpleHttpServerLib
 
         public void ParseQuery(string query)
         {
-
             var spl = query.Split(new char[] { '=','&' }).ToArray();
+            if (spl.Count() == 1)
+            {
+                Query.Add(spl[0], null);
+                return;
+            }
             for (int i = 0; i < spl.Length; i += 2)
             {
                 var nm = spl[i];
                 var val = spl[i + 1];
                 Query.Add(nm, val);
-
             }
         }
     }

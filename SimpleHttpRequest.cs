@@ -10,29 +10,83 @@ namespace SimpleHttpServerLib
     public class SimpleHttpRequest
     {
         public string Method = "GET";
-        public NetworkStream Stream;
+                
+        
         public bool IsComplete;
         public List<string> Raw = new List<string>();
         public string Header;
         public byte[] RawData;
-
+        public long ContentLen;
+        public string ContentType;
         public string Cookie { get; internal set; }
+        public NetworkStream Stream;
 
-        public  MultipartItem[] ParseMultipart()
+        public void Parse()
+        {
+            //1. detect content type
+            long len = -1;
+            if (Raw.Any(z => z.StartsWith("Content-Length: ")))
+            {
+                var fr = Raw.First(z => z.StartsWith("Content-Length: "));
+                len = long.Parse(fr.Split(new string[] { ":", " " }, StringSplitOptions.RemoveEmptyEntries)[1]);
+            }
+            ContentLen = len;
+            if (Raw.Any(z => z.StartsWith("Content-Type: ")))
+            {
+                var fr = Raw.First(z => z.StartsWith("Content-Type: "));
+                var sub = fr.Substring("Content-Type: ".Length);
+                var spl1 = sub.Split(new char[] { ';', '=' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
+                var dataType = spl1[0];
+                ContentType = dataType;
+            }
+        }
+
+        public string ParseUrlencoded()
+        {            
+            Parse();
+            
+            List<byte> data1 = new List<byte>();
+            while (true)
+            {
+                byte[] temp = new byte[2048];
+                var remains = ContentLen - data1.Count;
+                if (remains == 0) break;
+                if (remains < 2048)
+                {
+                    temp = new byte[remains];
+                    var cnt2 = Stream.Read(temp, 0, temp.Length);
+                    data1.AddRange(temp.Take(cnt2).ToArray());
+                    break;
+                }
+                var cnt1 = Stream.Read(temp, 0, temp.Length);
+                if (cnt1 == 0) break;
+                data1.AddRange(temp.Take(cnt1).ToArray());
+
+            }
+
+            var ms = new MemoryStream(data1.ToArray());
+            //File.WriteAllBytes("raw.dat", data1.ToArray());
+            RawData = data1.ToArray();
+
+            var dat = Encoding.UTF8.GetString(ms.ToArray());
+            return dat;
+
+        }
+        public MultipartItem[] ParseMultipart()
         {
             List<MultipartItem> ret = new List<MultipartItem>();
-            var req = this;
-            var rdr = new StreamReader(req.Stream);
+
+            var rdr = new StreamReader(Stream);
             long len = -1;
-            if (req.Raw.Any(z => z.StartsWith("Content-Length: ")))
+            if (Raw.Any(z => z.StartsWith("Content-Length: ")))
             {
-                var fr = req.Raw.First(z => z.StartsWith("Content-Length: "));
+                var fr = Raw.First(z => z.StartsWith("Content-Length: "));
                 len = long.Parse(fr.Split(new string[] { ":", " " }, StringSplitOptions.RemoveEmptyEntries)[1]);
             }
             string boundary = "";
-            if (req.Raw.Any(z => z.StartsWith("Content-Type: ")))
+            if (Raw.Any(z => z.StartsWith("Content-Type: ")))
             {
-                var fr = req.Raw.First(z => z.StartsWith("Content-Type: "));
+                var fr = Raw.First(z => z.StartsWith("Content-Type: "));
                 var sub = fr.Substring("Content-Type: ".Length);
                 var spl1 = sub.Split(new char[] { ';', '=' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
                 var dataType = spl1[0];
@@ -49,11 +103,11 @@ namespace SimpleHttpServerLib
                 if (remains < 2048)
                 {
                     temp = new byte[remains];
-                    var cnt2 = req.Stream.Read(temp, 0, temp.Length);
+                    var cnt2 = Stream.Read(temp, 0, temp.Length);
                     data1.AddRange(temp.Take(cnt2).ToArray());
                     break;
                 }
-                var cnt1 = req.Stream.Read(temp, 0, temp.Length);
+                var cnt1 = Stream.Read(temp, 0, temp.Length);
                 if (cnt1 == 0) break;
                 data1.AddRange(temp.Take(cnt1).ToArray());
 

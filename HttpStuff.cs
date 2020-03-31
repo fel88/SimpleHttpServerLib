@@ -1,4 +1,6 @@
-﻿using System.Net.Sockets;
+﻿using System.Drawing;
+using System.IO;
+using System.Net.Sockets;
 using System.Text;
 using System.Web;
 
@@ -8,8 +10,10 @@ namespace SimpleHttpServerLib
     {
         public static void SendResponse(NetworkStream stream, string data)
         {
+            byte[] temp = Encoding.UTF8.GetBytes(data);
+
             string Str = "HTTP/1.1 200 OK\nContent-type: text/html; charset=utf-8\nContent-Length:" +
-                             data.Length.ToString() + "\n\n" + data;
+                             temp.Length.ToString() + "\n\n" + data;
 
             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
             stream.Write(Buffer, 0, Buffer.Length);
@@ -22,6 +26,28 @@ namespace SimpleHttpServerLib
 
             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
             stream.Write(Buffer, 0, Buffer.Length);
+        }
+        public static void SendResponseJson(NetworkStream stream, string data)
+        {
+            byte[] temp = Encoding.UTF8.GetBytes(data);
+            string Str = "HTTP/1.1 200 OK\nContent-type: application/json; charset=utf-8\nContent-Length:" +
+                             temp.Length.ToString() + "\n\n" + data;
+
+            
+            byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+            stream.Write(Buffer, 0, Buffer.Length);
+        }
+        public static void SendResponseImg(NetworkStream stream, Bitmap data)
+        {
+            var ms = new MemoryStream();
+            data.Save(ms, System.Drawing.Imaging.ImageFormat.Jpeg);            
+            string Str = "HTTP/1.1 200 OK\nContent-type: image/jpeg; charset=utf-8\nContent-Length:" +
+                             ms.Length.ToString() + "\n\n" ;
+
+
+            byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+            stream.Write(Buffer, 0, Buffer.Length);
+            data.Save(stream, System.Drawing.Imaging.ImageFormat.Jpeg);
         }
         public static void SendResponse(NetworkStream stream, byte[] data)
         {

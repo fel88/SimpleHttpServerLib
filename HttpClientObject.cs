@@ -41,11 +41,42 @@ namespace SimpleHttpServerLib
                     var stream = Client.GetStream();
                     _stream = stream;
                     var rdr = new StreamReader(stream);
-                    var wrt = new StreamWriter(stream);
+
+                    //byte[] data = new byte[2048];
+
+                    /*StringBuilder sb = new StringBuilder();
+                    while (true)
+                    {
+                        var cnt = stream.Read(data, 0, data.Length);
+                        sb.Append(Encoding.UTF8.GetString(data.Take(cnt).ToArray()));
+                        if (cnt == 0) break;
+                    } */
+
 
                     while (true)
                     {
-                        var str = rdr.ReadLine();
+                        //var str = rdr.ReadLine();
+                        StringBuilder strb = new StringBuilder();
+                        List<byte> dd = new List<byte>();
+                        byte[] data = new byte[2];
+                        while (true)
+                        {
+                            var bb1 = stream.ReadByte();
+                            if (bb1 == -1) break;
+                            var bb = (byte)bb1;
+                            data[0] = data[1];
+                            data[1] = bb;
+                            dd.Add(bb);
+                            if (data[0] == 0xd && data[1] == 0xa)
+                            {
+                                dd.RemoveAt(dd.Count - 1);
+                                dd.RemoveAt(dd.Count - 1);
+                                break;
+                            }
+                        }
+
+                        var str = Encoding.UTF8.GetString(dd.ToArray());
+
                         Logger?.Log(str);
                         if (str == null) break;
                         if (currentRequest == null)
@@ -57,7 +88,9 @@ namespace SimpleHttpServerLib
 
                         if (currentRequest.IsComplete)
                         {
-                            var ctx = ProcessRequest(currentRequest, Client, stream);
+                            currentRequest.Stream = stream;
+
+                            var ctx = ProcessRequest(currentRequest, Client);
 
                             currentRequest = null;
                             if (SingletonCall || (ctx != null && ctx.CloseConnection))
@@ -96,16 +129,34 @@ namespace SimpleHttpServerLib
             Mimes.Add(new MimeInfo() { Extension = "wmv", Mime = "video/x-ms-wmv" });
             Mimes.Add(new MimeInfo() { Extension = "mp4", Mime = "video/mp4" });
             Mimes.Add(new MimeInfo() { Extension = "png", Mime = "image/png" });
+            Mimes.Add(new MimeInfo() { Extension = "ico", Mime = "image/x-icon" });
+            Mimes.Add(new MimeInfo() { Extension = "jpg", Mime = "image/jpeg" });
+            Mimes.Add(new MimeInfo() { Extension = "jpeg", Mime = "image/jpeg" });
+
         }
 
-        private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client, NetworkStream stream)
+        private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client/*, NetworkStream stream, StreamReader rdr2 = null*/)
         {
-            currentRequest.Stream = stream;
+            var stream = currentRequest.Stream;
+            //currentRequest.Stream = stream;
             var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
             var ip = addr.ToString();
-
+            /*var b = rdr2.Read();       
+            rdr2.DiscardBufferedData();
+             b = rdr2.Read();
+            var rr = new StreamReader(stream);
+            var b2 = rr.Read();*/
             if (currentRequest.Method == "POST")
             {
+                var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
+
+                if (cc != null)
+                {
+                    var spl2 = cc.Split(new char[] { ':', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
+                    var cookieId = spl2[1];
+                    currentRequest.Cookie = cookieId;
+                }
+
                 /*var g = Guid.NewGuid().ToString().Replace("-", "");
                 CookieId = g;
                 string Str = "HTTP/1.1 302 Found\nSet-Cookie: " + g + "\n\n";
@@ -143,6 +194,41 @@ namespace SimpleHttpServerLib
                         return null;
                     }
                 }
+
+                var spl = currentRequest.Header.Split(new char[] { '/', ' ', '?' }, StringSplitOptions.RemoveEmptyEntries)
+                 .ToArray();
+                var splh = currentRequest.Header.Split(new string[] { "POST", "GET", "HTTP", " ", "?" }, StringSplitOptions.RemoveEmptyEntries)
+                 .ToArray();
+
+
+                string path = spl[1];
+                path = splh[0];
+
+                Console.WriteLine($"[{ip}] request: " + path);
+                HttpServer.Log($"[{ip}] request: " + path);
+
+                var ctx = new SimpleHttpContext();
+            
+                if (HtmlGenerator.CodeTypes.ContainsKey(path))
+                {
+                    ctx.CodeType = HtmlGenerator.CodeTypes[path];
+                }
+                else
+                {
+                    ctx.CodeType = HtmlGenerator.DefaultCodeType;
+                }
+                if (currentRequest.Header.Contains("?"))
+                {
+                    var query = spl[2];
+                    query = Http​Utility.UrlDecode(query);
+                    ctx.ParseQuery(query);
+                }
+                ctx.Page = Activator.CreateInstance(ctx.CodeType) as HttpPage;
+                ctx.Request = currentRequest;
+                ctx.IP = ip;
+                ctx.Page.OnPageLoad(ctx);
+
+
             }
             else if (currentRequest.Method == "GET")
             {
@@ -285,15 +371,19 @@ namespace SimpleHttpServerLib
                         if (ctx.Redirect)
                         {
                             StringBuilder sb = new StringBuilder();
-
-                            sb.Append("HTTP/1.1 303 See other\n");
+                        
+                            sb.Append("HTTP/1.1 303 See other\r\n");                            
                             foreach (var hitem in ctx.Response.Headers)
                             {
-                                sb.Append($"{hitem.Key}: {hitem.Value}\n");
+                                sb.Append($"{hitem.Key}: {hitem.Value}\r\n");
                             }
-                            sb.Append("Location: " + ctx.RedirectPath + "\n\n");
+                            sb.Append("Location: " + ctx.RedirectPath + "\r\n\r\n");
+                            //sb.Append("Refresh: 0; url=" + ctx.RedirectPath + "\r\n");                            
+                            
+                            
                             byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
                             stream.Write(Buffer, 0, Buffer.Length);
+                            stream.Close();                          
                         }
                         else
                         {
