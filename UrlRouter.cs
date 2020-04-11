@@ -52,6 +52,15 @@ namespace SimpleHttpServerLib
         }
 
         public List<CleanUrl> CleanUrls = new List<CleanUrl>();
+    }
 
+    public class RouterMethodAttribute : Attribute
+    {
+        public string Path;        
+    }
+
+    public enum RouterAccessLevel
+    {
+        All, Users, Admin
     }
 }

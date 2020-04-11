@@ -15,7 +15,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>true</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -46,7 +46,7 @@
     <Compile Include="HtmlGenerator.cs" />
     <Compile Include="HttpClientObject.cs" />
     <Compile Include="HttpConnectInfo.cs" />
-    <Compile Include="HttpContext.cs" />
+    <Compile Include="SimpleHttpContext.cs" />
     <Compile Include="HttpPage.cs" />
     <Compile Include="HttpParseProcessor.cs" />
     <Compile Include="HttpSimpleParser.cs" />
@@ -56,6 +56,7 @@
     <Compile Include="MultipartItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="HttpServer.cs" />
+    <Compile Include="RouterController.cs" />
     <Compile Include="SessionInfo.cs" />
     <Compile Include="SimpleHttpRequest.cs" />
     <Compile Include="SimpleHttpResponse.cs" />

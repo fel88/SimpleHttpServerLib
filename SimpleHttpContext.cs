@@ -16,6 +16,7 @@ namespace SimpleHttpServerLib
         public SimpleHttpResponse Response { get; set; } = new SimpleHttpResponse();
         public bool CloseConnection { get; set; }
         public string IP { get; set; }
+        public SessionInfo Session { get; set; }
 
         public void ParseQuery(string query)
         {

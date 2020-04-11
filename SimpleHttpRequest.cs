@@ -163,6 +163,7 @@ namespace SimpleHttpServerLib
             var ms2 = new MemoryStream(chunks[0]);
             var mrdr = new StreamReader(ms2);
             string fn = "";
+            bool isFormData = false;
             while (true)
             {
                 var ln = mrdr.ReadLine();
@@ -174,7 +175,15 @@ namespace SimpleHttpServerLib
                         var fr = raw.First(z => z.StartsWith("Content-Disposition: "));
                         var sub = fr.Substring("Content-Disposition: ".Length);
                         var spl1 = sub.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToArray();
-                        fileName = spl1[2];
+                        if (sub.Contains("form-data"))
+                        {
+                            isFormData = true;
+                            fn = spl1[1];
+                        }
+                        else
+                        {
+                            fileName = spl1[2];
+                        }
                     }
 
 

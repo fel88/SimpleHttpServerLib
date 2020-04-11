@@ -132,20 +132,17 @@ namespace SimpleHttpServerLib
             Mimes.Add(new MimeInfo() { Extension = "ico", Mime = "image/x-icon" });
             Mimes.Add(new MimeInfo() { Extension = "jpg", Mime = "image/jpeg" });
             Mimes.Add(new MimeInfo() { Extension = "jpeg", Mime = "image/jpeg" });
+            Mimes.Add(new MimeInfo() { Extension = "svg", Mime = "image/svg+xml" });
 
         }
 
-        private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client/*, NetworkStream stream, StreamReader rdr2 = null*/)
+        private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client)
         {
             var stream = currentRequest.Stream;
-            //currentRequest.Stream = stream;
+            
             var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
             var ip = addr.ToString();
-            /*var b = rdr2.Read();       
-            rdr2.DiscardBufferedData();
-             b = rdr2.Read();
-            var rr = new StreamReader(stream);
-            var b2 = rr.Read();*/
+            
             if (currentRequest.Method == "POST")
             {
                 var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
