@@ -17,6 +17,7 @@ namespace SimpleHttpServerLib
 
             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
             stream.Write(Buffer, 0, Buffer.Length);
+            stream.Flush();
         }
 
         public static void SendResponsePlain(NetworkStream stream, string data)
@@ -26,6 +27,7 @@ namespace SimpleHttpServerLib
 
             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
             stream.Write(Buffer, 0, Buffer.Length);
+            stream.Flush();
         }
         public static void SendResponseJson(NetworkStream stream, string data)
         {
@@ -36,6 +38,7 @@ namespace SimpleHttpServerLib
             
             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
             stream.Write(Buffer, 0, Buffer.Length);
+            stream.Flush();
         }
         public static void SendResponseImg(NetworkStream stream, Bitmap data)
         {
@@ -48,6 +51,7 @@ namespace SimpleHttpServerLib
             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
             stream.Write(Buffer, 0, Buffer.Length);
             data.Save(stream, System.Drawing.Imaging.ImageFormat.Jpeg);
+            stream.Flush();
         }
         public static void SendResponse(NetworkStream stream, byte[] data)
         {

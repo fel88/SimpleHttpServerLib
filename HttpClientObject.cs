@@ -7,6 +7,8 @@ using System.Text;
 using System.Threading;
 using System.Net;
 using System.Web;
+using System.Diagnostics;
+using System.IO.Compression;
 
 namespace SimpleHttpServerLib
 {
@@ -118,31 +120,74 @@ namespace SimpleHttpServerLib
         {
             public string Extension;
             public string Mime;
+            public bool NeverExpirePolicy;
         }
 
+        public class ResourceInfo
+        {
+            public string Path;
+            public bool Expires;
+        }
         public static List<MimeInfo> Mimes = new List<MimeInfo>();
 
         static HttpClientObject()
         {
-            Mimes.Add(new MimeInfo() { Extension = "css", Mime = "text/css" });
-            Mimes.Add(new MimeInfo() { Extension = "js", Mime = "application/javascript" });
-            Mimes.Add(new MimeInfo() { Extension = "wmv", Mime = "video/x-ms-wmv" });
-            Mimes.Add(new MimeInfo() { Extension = "mp4", Mime = "video/mp4" });
+            Mimes.Add(new MimeInfo() { Extension = "css", Mime = "text/css", NeverExpirePolicy = true });
+            Mimes.Add(new MimeInfo() { Extension = "js", Mime = "application/javascript", NeverExpirePolicy = true });
+            Mimes.Add(new MimeInfo() { Extension = "wmv", Mime = "video/x-ms-wmv", NeverExpirePolicy = true });
+            Mimes.Add(new MimeInfo() { Extension = "mp4", Mime = "video/mp4", NeverExpirePolicy = true });
             Mimes.Add(new MimeInfo() { Extension = "png", Mime = "image/png" });
-            Mimes.Add(new MimeInfo() { Extension = "ico", Mime = "image/x-icon" });
+            Mimes.Add(new MimeInfo() { Extension = "ico", Mime = "image/x-icon", NeverExpirePolicy = true });
             Mimes.Add(new MimeInfo() { Extension = "jpg", Mime = "image/jpeg" });
             Mimes.Add(new MimeInfo() { Extension = "jpeg", Mime = "image/jpeg" });
             Mimes.Add(new MimeInfo() { Extension = "svg", Mime = "image/svg+xml" });
+            Mimes.Add(new MimeInfo() { Extension = "woff", Mime = "font/woff", NeverExpirePolicy = true });
+            Mimes.Add(new MimeInfo() { Extension = "woff2", Mime = "font/woff2", NeverExpirePolicy = true });
 
         }
+        public static void CopyTo(Stream src, Stream dest)
+        {
+            byte[] bytes = new byte[4096];
+
+            int cnt;
+
+            while ((cnt = src.Read(bytes, 0, bytes.Length)) != 0)
+            {
+                dest.Write(bytes, 0, cnt);
+            }
+        }
+        public static byte[] Zip(byte[] bts)
+        {
+            using (var msi = new MemoryStream(bts))
+            using (var mso = new MemoryStream())
+            {
+                using (var gs = new GZipStream(mso, CompressionMode.Compress))
+                {
+                    //msi.CopyTo(gs);
+                    CopyTo(msi, gs);
+                }
+
+                return mso.ToArray();
+            }
+        }
+
+        public static byte[] Zip(string str)
+        {
+            var bytes = Encoding.UTF8.GetBytes(str);
+
+            return Zip(bytes);
+
+        }
+
+        public static bool UseExpires = true;
 
         private SimpleHttpContext ProcessRequest(SimpleHttpRequest currentRequest, TcpClient client)
         {
             var stream = currentRequest.Stream;
-            
+
             var addr = (client.Client.RemoteEndPoint as IPEndPoint).Address;
             var ip = addr.ToString();
-            
+
             if (currentRequest.Method == "POST")
             {
                 var cc = currentRequest.Raw.FirstOrDefault(z => z.StartsWith("Cookie"));
@@ -177,6 +222,7 @@ namespace SimpleHttpServerLib
 
                             stream.Write(Buffer, 0, Buffer.Length);
                             stream.Write(bb, 0, bb.Length);
+                            stream.Flush();
                             return null;
                         }
                     }
@@ -205,7 +251,7 @@ namespace SimpleHttpServerLib
                 HttpServer.Log($"[{ip}] request: " + path);
 
                 var ctx = new SimpleHttpContext();
-            
+
                 if (HtmlGenerator.CodeTypes.ContainsKey(path))
                 {
                     ctx.CodeType = HtmlGenerator.CodeTypes[path];
@@ -292,6 +338,7 @@ namespace SimpleHttpServerLib
 
                                 stream.Write(Buffer, 0, Buffer.Length);
                                 stream.Write(bb, 0, bb.Length);
+                                stream.Flush();
                                 return null;
                             }
                         }
@@ -304,6 +351,7 @@ namespace SimpleHttpServerLib
 
                         byte[] Buffer = Encoding.UTF8.GetBytes(Str);
                         stream.Write(Buffer, 0, Buffer.Length);
+                        stream.Flush();
                         return null;
                     }
 
@@ -314,14 +362,47 @@ namespace SimpleHttpServerLib
                     var p1 = (HtmlGenerator.GetAbsolutePath(path));
                     if (path.EndsWith(item.Extension) && File.Exists(p1))
                     {
+
+                        StringBuilder sb = new StringBuilder();
+                        sb.Append("HTTP/1.1 200 OK\n");
+
+                        ResourceInfo res = null;
+                        if (item.NeverExpirePolicy && UseExpires)
+                        {
+                            string expDate = (DateTime.Now.AddDays(365)).ToUniversalTime().ToString("r");
+                            sb.Append($"Expires: {expDate}\n");
+                        }
+                        bool gzip = false;
+                        if (currentRequest.Raw.Any(z => z.Contains("gzip")))
+                        {
+                            sb.Append($"Content-Encoding: gzip\n");
+                            gzip = true;
+                        }
+                        sb.Append($"Content-type: {item.Mime}; charset=utf-8\n");
+
                         var bb = File.ReadAllBytes(HtmlGenerator.GetAbsolutePath(path));
+                        if (gzip)
+                        {
+                            var bres = Zip(bb);
 
-                        string Str = $"HTTP/1.1 200 OK\nContent-type: {item.Mime}; charset=utf-8\nContent-Length:" +
-                                     bb.Length.ToString() + "\n\n";
-                        byte[] Buffer = Encoding.UTF8.GetBytes(Str);
+                            sb.Append($"Content-Length:{bres.Length}\n\n");
+                            byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
+                            stream.Write(Buffer, 0, Buffer.Length);
+                            stream.Write(bres, 0, bres.Length);
+                        }
+                        else
+                        {
+                            sb.Append($"Content-Length:{bb.Length}\n\n");
+                            byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
+                            stream.Write(Buffer, 0, Buffer.Length);
+                            stream.Write(bb, 0, bb.Length);
+                        }
 
-                        stream.Write(Buffer, 0, Buffer.Length);
-                        stream.Write(bb, 0, bb.Length);
+
+
+
+
+                        stream.Flush();
                         return null;
                     }
                 }
@@ -329,6 +410,7 @@ namespace SimpleHttpServerLib
 
                 if (path.EndsWith("htm") && File.Exists(HtmlGenerator.GetAbsolutePath(path)))
                 {
+                    Stopwatch sw = Stopwatch.StartNew();
                     Html = HtmlGenerator.Get(HtmlGenerator.GetAbsolutePath(path));
 
                     SimpleHttpContext ctx = new SimpleHttpContext();
@@ -368,19 +450,19 @@ namespace SimpleHttpServerLib
                         if (ctx.Redirect)
                         {
                             StringBuilder sb = new StringBuilder();
-                        
-                            sb.Append("HTTP/1.1 303 See other\r\n");                            
+
+                            sb.Append("HTTP/1.1 303 See other\r\n");
                             foreach (var hitem in ctx.Response.Headers)
                             {
                                 sb.Append($"{hitem.Key}: {hitem.Value}\r\n");
                             }
                             sb.Append("Location: " + ctx.RedirectPath + "\r\n\r\n");
                             //sb.Append("Refresh: 0; url=" + ctx.RedirectPath + "\r\n");                            
-                            
-                            
+
+
                             byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
                             stream.Write(Buffer, 0, Buffer.Length);
-                            stream.Close();                          
+                            stream.Close();
                         }
                         else
                         {
@@ -392,18 +474,46 @@ namespace SimpleHttpServerLib
                                 sb.Append($"{hitem.Key}: {hitem.Value}\n");
                             }
 
-                            var len = Encoding.UTF8.GetBytes(Html).Length;
+                            //var len = Encoding.UTF8.GetBytes(Html).Length;
 
-                            sb.Append("Content-type: text/html; charset=utf-8\nContent-Length:" +
-                                         //Html.Length.ToString()
-                                         len.ToString()
-                                         + "\n\n" + Html);
+                            sb.Append("Content-type: text/html; charset=utf-8\n");
+                            bool gzip = false;
+                            if (currentRequest.Raw.Any(z => z.Contains("gzip")))
+                            {
+                                sb.Append($"Content-Encoding: gzip\n");
+                                gzip = true;
+                            }
+
+                            if (gzip)
+                            {
+                                var bres = Zip(Html);
+
+                                sb.Append($"Content-Length:{bres.Length}\n\n");
+                                byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
+                                stream.Write(Buffer, 0, Buffer.Length);
+                                stream.Write(bres, 0, bres.Length);
+                            }
+                            else
+                            {
+                                byte[] Buffer2 = Encoding.UTF8.GetBytes(Html);
+                                sb.Append($"Content-Length:{Buffer2.Length}\n\n");
+                                byte[] Buffer = Encoding.UTF8.GetBytes(sb.ToString());
+                                stream.Write(Buffer, 0, Buffer.Length);
+                                stream.Write(Buffer2, 0, Buffer2.Length);
+                            }
+
+
+                            /*sb.Append("Content-Length:" + len.ToString() + "\n\n");
+
+                            sb.Append(Html);
 
                             var Str = sb.ToString();
 
                             byte[] Buffer = Encoding.UTF8.GetBytes(Str);
 
-                            stream.Write(Buffer, 0, Buffer.Length);
+                            stream.Write(Buffer, 0, Buffer.Length);*/
+                            stream.Flush();
+                            stream.Close();
                         }
                         return ctx;
 
@@ -416,6 +526,12 @@ namespace SimpleHttpServerLib
 
                         byte[] Buffer = Encoding.UTF8.GetBytes(Str);
                         stream.Write(Buffer, 0, Buffer.Length);
+                        stream.Flush();
+                    }
+                    finally
+                    {
+                        Console.WriteLine($"[{ip}] htm processed within: " + sw.ElapsedMilliseconds + "ms");
+                        HttpServer.Log($"[{ip}] htm processed within: " + sw.ElapsedMilliseconds + "ms");
                     }
                 }
 
@@ -447,10 +563,7 @@ namespace SimpleHttpServerLib
 
                         byte[] Buffer = Encoding.UTF8.GetBytes(Str);
                         stream.Write(Buffer, 0, Buffer.Length);
-
-
-
-
+                        stream.Flush();
                     }
 
                 }
